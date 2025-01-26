@@ -1,14 +1,14 @@
+from datetime import datetime, timezone, timedelta
 from functools import wraps
 
-from flask import request, session, jsonify
-from redis import RedisError
+from flask import session, jsonify
 
-from extensions import redis_client
 from config import Config
 
 
 def is_logged_in():
     return session.get('username')
+
 
 def login_required(f):
     @wraps(f)
@@ -18,26 +18,24 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
 def store_verification_token(verification_token):
-    session_id = request.cookies.get('session')
-    if session_id:
-        redis_client.set(
-            f"{session_id}:verification_token",
-            verification_token,
-            ex=Config.VERIFICATION_TOKEN_TTL
-        )
+    session['verification_token'] = {
+        "token": verification_token,
+        "expires_at": (datetime.now(timezone.utc) + timedelta(seconds=Config.VERIFICATION_TOKEN_TTL)).isoformat()
+    }
+
 
 def get_verification_token():
-    try:
-        session_id = request.cookies.get('session')
-        if not session_id:
-            return None
-        token = redis_client.get(f"{session_id}:verification_token")
-        return token.decode("utf-8") if token else None
-    except RedisError:
+    token_data = session.get('verification_token')
+    if not token_data:
         return None
+    expires_at = datetime.fromisoformat(token_data.get("expires_at"))
+    if datetime.now(timezone.utc) > expires_at:
+        remove_verification_token()
+        return None
+    return token_data.get("token")
+
 
 def remove_verification_token():
-    session_id = request.cookies.get('session')
-    if session_id:
-        redis_client.delete(f"{session_id}:verification_token")
+    session.pop('verification_token', None)

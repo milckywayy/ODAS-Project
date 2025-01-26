@@ -13,6 +13,12 @@ from utils.validation import is_valid_username, is_valid_email, is_valid_passwor
 auth_blueprint = Blueprint("auth", __name__)
 
 
+@auth_blueprint.route("/init_session", methods=["GET"])
+def init_session():
+    session['initialized'] = True
+    return jsonify({"message": "Session initialized"}), 200
+
+
 @auth_blueprint.route("/register", methods=["POST"])
 def register():
     data = request.get_json()
