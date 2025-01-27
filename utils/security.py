@@ -26,3 +26,6 @@ def generate_session_token():
 def generate_new_user_totp_secret():
     return pyotp.random_base32()
 
+
+def generate_password_reset_token():
+    return str(uuid.uuid4())

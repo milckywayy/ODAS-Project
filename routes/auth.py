@@ -1,12 +1,14 @@
 import logging
-from flask import Blueprint, request, jsonify, session, redirect
+from flask import Blueprint, request, jsonify, session, current_app
+
+from config import Token
 from utils.database import check_if_user_exist, add_pending_user, check_if_user_exist_by_username, \
     get_user_password_hash, \
     save_user_totp_secret, confirm_user, get_pending_user, remove_pending_user, \
     check_if_totp_active
 from utils.mail import send_verification_mail
-from utils.security import hash_password, check_password, generate_new_user_totp_secret
-from utils.session import get_verification_token, login_required, store_verification_token, remove_verification_token
+from utils.security import hash_password, check_password, generate_new_user_totp_secret, generate_password_reset_token
+from utils.session import login_required
 from utils.totp import verify_totp, generate_totp_uri
 from utils.validation import is_valid_username, is_valid_email, is_valid_password
 
@@ -58,7 +60,7 @@ def confirm_email(username, verification_token):
         logging.info(f"User {username} doesn't exist")
         return jsonify({"message": "Invalid data was given"}), 400
 
-    correct_verification_token = get_verification_token()
+    correct_verification_token = current_app.config['STORAGE'].get(username, Token.VERIFICATION.token_name)
     if not correct_verification_token:
         remove_pending_user(username)
         return jsonify({"message": "Verification token has expired"}), 400
@@ -134,18 +136,23 @@ def enable_totp():
     if check_if_totp_active(username):
         return jsonify({"message": "TOTP verification already active"}), 400
 
-    if not totp_code or not get_verification_token():
+    if not totp_code or not current_app.config['STORAGE'].get(username, Token.TOTP.token_name):
         new_user_totp_secret = generate_new_user_totp_secret()
-        store_verification_token(new_user_totp_secret)
+        current_app.config['STORAGE'].set(
+            username,
+            Token.TOTP.token_name,
+            new_user_totp_secret,
+            ttl=Token.TOTP.ttl
+        )
 
         totp_uri = generate_totp_uri(new_user_totp_secret)
 
         return jsonify({"message": "TOTP uri has been generated", "totp_uri": totp_uri}), 200
 
-    totp_secret = get_verification_token()
+    totp_secret = current_app.config['STORAGE'].get(username, Token.TOTP.token_name)
     if not verify_totp(totp_code, totp_secret):
         return jsonify({"message": "Invalid TOTP code"}), 400
 
-    remove_verification_token()
+    current_app.config['STORAGE'].delete(username, Token.TOTP.token_name)
     save_user_totp_secret(username, totp_secret)
     return jsonify({"message": "TOTP verification has been enabled"}), 200

@@ -1,6 +1,8 @@
+from config import Token
 from extensions import db
 from utils.security import generate_verification_token
-from utils.session import store_verification_token, remove_verification_token, get_verification_token
+
+from flask import current_app
 
 
 def add_pending_user(username, email, password):
@@ -15,7 +17,14 @@ def add_pending_user(username, email, password):
     })
 
     verification_token = generate_verification_token()
-    store_verification_token(verification_token)
+    current_app.config['STORAGE'].set(
+        username,
+        Token.VERIFICATION.token_name,
+        verification_token,
+        ttl=Token.VERIFICATION.ttl
+    )
+
+    print(current_app.config['STORAGE'].get(username, Token.VERIFICATION.token_name))
 
     return verification_token
 
@@ -26,7 +35,7 @@ def remove_pending_user(username):
         return
 
     doc_ref.delete()
-    remove_verification_token()
+    current_app.config['STORAGE'].delete(username, Token.VERIFICATION.token_name)
 
 
 def check_if_user_exist_by_username(username, check_not_confirmed=False):
@@ -41,7 +50,8 @@ def check_if_user_exist_by_username(username, check_not_confirmed=False):
         pending_doc = pending_ref.get()
 
         if pending_doc.exists:
-            if not get_verification_token():
+            verification_token = current_app.config['STORAGE'].get(username, Token.VERIFICATION.token_name)
+            if not verification_token:
                 remove_pending_user(username)
                 return False
             else:
@@ -64,7 +74,8 @@ def check_if_user_exist_by_email(email, check_not_confirmed=False):
         for doc in query_pending:
             username = doc.to_dict().get("username")
 
-            if not get_verification_token():
+            verification_token = current_app.config['STORAGE'].get(username, Token.VERIFICATION.token_name)
+            if not verification_token:
                 remove_pending_user(username)
                 return False
             else:
