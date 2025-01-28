@@ -21,3 +21,15 @@ class Token(Enum):
     def __init__(self, token_name, ttl):
         self.token_name = token_name
         self.ttl = ttl
+
+
+class Event(Enum):
+    FAILED_LOGIN_ATTEMPT = 'Failed login attempt'
+    SUCCESSFUL_LOGIN_ATTEMPT = 'Successful login attempt'
+    LOGIN_FROM_NEW_DEVICE = 'Login from new device'
+    PASSWORD_CHANGED = 'Password changed'
+    TOTP_VERIFICATION_ON = 'TOTP verification turned on'
+    TOTP_VERIFICATION_OFF = 'TOTP verification turned off'
+
+    def __init__(self, event_name):
+        self.event_name = event_name

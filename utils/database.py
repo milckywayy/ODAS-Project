@@ -1,4 +1,7 @@
+from datetime import datetime
+
 from google.cloud import firestore
+from google.cloud.firestore_v1 import FieldFilter
 
 from config import Token
 from extensions import db
@@ -212,3 +215,33 @@ def remove_user_totp_secret(username):
     doc_ref.update({
         "totp_secret": firestore.DELETE_FIELD
     })
+
+
+def log_user_event(username, event, details):
+    event_data = {
+        "username": username,
+        "event_type": event.event_name,
+        "details": details,
+        "timestamp": datetime.now().strftime("%H:%M:%S %d-%m-%Y")
+    }
+
+    db.collection("users").document(username).collection('events').add(event_data)
+
+
+def save_user_device(username, device_info):
+    device_data = {
+        "username": username,
+        "device_info": device_info,
+    }
+
+    db.collection("users").document(username).collection("devices").add(device_data)
+
+
+def check_if_device_used(username, device_info):
+    devices_ref = db.collection("users").document(username).collection("devices")
+    query = devices_ref.where("device_info", "==", device_info).stream()
+
+    for _ in query:
+        return True
+
+    return False
