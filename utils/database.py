@@ -1,3 +1,5 @@
+from google.cloud import firestore
+
 from config import Token
 from extensions import db
 from utils.security import generate_verification_token
@@ -36,6 +38,31 @@ def remove_pending_user(username):
 
     doc_ref.delete()
     current_app.config['STORAGE'].delete(username, Token.VERIFICATION.token_name)
+
+
+def delete_user(identifier):
+    # identifier: The username or email of the user to delete.
+
+    user_ref = db.collection("users").document(identifier)
+    user_doc = user_ref.get()
+
+    if not user_doc.exists:
+        users_ref = db.collection("users")
+        query = users_ref.where("email", "==", identifier).stream()
+
+        user_found = None
+        for doc in query:
+            user_found = doc.id
+            break
+
+        if not user_found:
+            raise ValueError("User does not exist.")
+
+        user_ref = db.collection("users").document(user_found)
+        identifier = user_found
+
+    user_ref.delete()
+    print(f"User '{identifier}' and associated data have been deleted.")
 
 
 def check_if_user_exist_by_username(username, check_not_confirmed=False):
@@ -132,17 +159,6 @@ def check_if_user_exist(username, email, check_not_confirmed=False):
     return check_if_user_exist_by_username(username, check_not_confirmed) or check_if_user_exist_by_email(email, check_not_confirmed)
 
 
-def get_user_password_hash(username):
-    doc_ref = db.collection("users").document(username)
-    doc = doc_ref.get()
-
-    if not doc.exists:
-        return None
-
-    user_data = doc.to_dict()
-    return user_data["password"]
-
-
 def get_pending_user(username):
     user_ref = db.collection("pending_users").document(username)
     return user_ref
@@ -183,4 +199,16 @@ def save_user_totp_secret(username, totp_secret):
 
     doc_ref.update({
         "totp_secret": totp_secret
+    })
+
+
+def remove_user_totp_secret(username):
+    doc_ref = db.collection("users").document(username)
+    doc = doc_ref.get()
+
+    if not doc.exists:
+        raise ValueError("User does not exist")
+
+    doc_ref.update({
+        "totp_secret": firestore.DELETE_FIELD
     })

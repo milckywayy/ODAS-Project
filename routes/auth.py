@@ -3,9 +3,8 @@ from flask import Blueprint, request, jsonify, session, current_app
 
 from config import Token
 from utils.database import check_if_user_exist, add_pending_user, check_if_user_exist_by_username, \
-    get_user_password_hash, \
     save_user_totp_secret, confirm_user, get_pending_user, remove_pending_user, \
-    check_if_totp_active, get_username_by_email, set_password, check_if_user_exist_by_email, get_password
+    check_if_totp_active, get_username_by_email, set_password, check_if_user_exist_by_email, get_password, delete_user
 from utils.mail import send_verification_mail, send_password_reset_mail
 from utils.security import hash_password, check_password, generate_new_user_totp_secret, generate_password_reset_token
 from utils.session import login_required
@@ -71,6 +70,45 @@ def confirm_email(username, verification_token):
     return jsonify({"message": "Email successfully confirmed"}), 200
 
 
+@auth_blueprint.route("/delete_account", methods=["DELETE"])
+@login_required
+def delete_account():
+    data = request.get_json()
+
+    username = session.get('username')
+    password = data.get('password')
+    totp_code = data.get('totp_code')
+
+    if not username or not password:
+        return jsonify({"message": "Username and password are required"}), 400
+
+    if not check_if_user_exist_by_username(username):
+        logging.info(f"Account deletion requested for nonexistent user: {username}")
+        return jsonify({"message": "Invalid credentials"}), 400
+
+    stored_password = get_password(username)
+    if not check_password(password, stored_password):
+        logging.info(f"User {username} provided invalid password for account deletion")
+        return jsonify({"message": "Invalid credentials"}), 400
+
+    totp_secret = check_if_totp_active(username)
+    if totp_secret:
+        if not totp_code:
+            return jsonify({"message": "TOTP code is required"}), 400
+
+        if not verify_totp(totp_code, totp_secret):
+            return jsonify({"message": "Invalid TOTP code"}), 400
+
+    try:
+        delete_user(username)
+        session.pop('username', None)
+        logging.info(f"Account for user {username} successfully deleted")
+        return jsonify({"message": "Account successfully deleted"}), 200
+    except Exception as e:
+        logging.error(f"Error deleting user {username}: {e}")
+        return jsonify({"message": "An error occurred while deleting the account"}), 500
+
+
 @auth_blueprint.route("/login", methods=["POST"])
 def login():
     data = request.get_json()
@@ -86,7 +124,7 @@ def login():
         logging.info(f"User {username} does not exist")
         return jsonify({"message": "Invalid credentials were given"}), 400
 
-    hashed_password = get_user_password_hash(username)
+    hashed_password = get_password(username)
 
     # TODO Implement invalid login try latency
 
@@ -119,7 +157,7 @@ def test_session():
     return jsonify({"message": "You're authorized!"}), 200
 
 
-@auth_blueprint.route("/generate-totp-code", methods=["POST"])
+@auth_blueprint.route("/enable_totp", methods=["POST"])
 @login_required
 def enable_totp():
     data = request.get_json()
@@ -152,12 +190,52 @@ def enable_totp():
     return jsonify({"message": "TOTP verification has been enabled"}), 200
 
 
+@auth_blueprint.route("/disable_totp", methods=["POST"])
+@login_required
+def disable_totp():
+    data = request.get_json()
+
+    username = session.get('username')
+    password = data.get('password')
+    totp_code = data.get('totp_code')
+
+    print(username)
+
+    if not username or not password:
+        return jsonify({"message": "Password is required to disable TOTP"}), 400
+
+    if not check_if_user_exist_by_username(username):
+        logging.info(f"TOTP disable requested for nonexistent user: {username}")
+        return jsonify({"message": "Invalid credentials"}), 400
+
+    stored_password = get_password(username)
+    if not check_password(password, stored_password):
+        logging.info(f"User {username} provided an invalid password for disabling TOTP")
+        return jsonify({"message": "Invalid credentials"}), 400
+
+    totp_secret = check_if_totp_active(username)
+    if totp_secret:
+        if not totp_code:
+            return jsonify({"message": "TOTP code is required"}), 400
+
+        if not verify_totp(totp_code, totp_secret):
+            return jsonify({"message": "Invalid TOTP code"}), 400
+
+    try:
+        save_user_totp_secret(username, None)
+        logging.info(f"TOTP authentication disabled for user {username}")
+        return jsonify({"message": "TOTP authentication successfully disabled"}), 200
+    except Exception as e:
+        logging.error(f"Error disabling TOTP for user {username}: {e}")
+        return jsonify({"message": "An error occurred while disabling TOTP"}), 500
+
+
 @auth_blueprint.route("/change_password", methods=["POST"])
 @login_required
 def change_password():
     data = request.get_json()
 
-    username = data.get('username')
+    username = session.get('username')
     current_password = data.get('current_password')
     new_password = data.get('new_password')
     totp_code = data.get('totp_code')
