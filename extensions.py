@@ -3,6 +3,7 @@ from firebase_admin import credentials, firestore
 
 from config import Config
 from utils.cache import Cache
+from utils.ratelimiter import limiter
 
 cred = credentials.Certificate("credentials/firestore.json")
 firebase_admin.initialize_app(cred)
@@ -13,3 +14,5 @@ cache = Cache()
 def init_extensions(app):
     app.config["SECRET_KEY"] = Config.SECRET_KEY
     app.config['STORAGE'] = cache
+
+    limiter.init_app(app)

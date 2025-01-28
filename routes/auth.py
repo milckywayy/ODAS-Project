@@ -6,6 +6,7 @@ from utils.database import check_if_user_exist, add_pending_user, check_if_user_
     save_user_totp_secret, confirm_user, get_pending_user, remove_pending_user, \
     check_if_totp_active, get_username_by_email, set_password, check_if_user_exist_by_email, get_password, delete_user
 from utils.mail import send_verification_mail, send_password_reset_mail
+from utils.ratelimiter import limiter
 from utils.security import hash_password, check_password, generate_new_user_totp_secret, generate_password_reset_token
 from utils.session import login_required
 from utils.totp import verify_totp, generate_totp_uri
@@ -15,6 +16,7 @@ auth_blueprint = Blueprint("auth", __name__)
 
 
 @auth_blueprint.route("/register", methods=["POST"])
+@limiter.limit("10 per 10 minutes")
 def register():
     data = request.get_json()
 
@@ -45,6 +47,7 @@ def register():
 
 
 @auth_blueprint.route("/confirm_email/<username>/<verification_token>", methods=["GET"])
+@limiter.limit("15 per 10 minutes")
 def confirm_email(username, verification_token):
     if not username or not verification_token:
         return jsonify({"message": "No username or verification token were given"}), 400
@@ -110,6 +113,7 @@ def delete_account():
 
 
 @auth_blueprint.route("/login", methods=["POST"])
+@limiter.limit("15 per 10 minutes")
 def login():
     data = request.get_json()
 
@@ -125,8 +129,6 @@ def login():
         return jsonify({"message": "Invalid credentials were given"}), 400
 
     hashed_password = get_password(username)
-
-    # TODO Implement invalid login try latency
 
     if not check_password(password, hashed_password):
         logging.info(f'User {username} tried to login with invalid password')
@@ -158,6 +160,7 @@ def test_session():
 
 
 @auth_blueprint.route("/enable_totp", methods=["POST"])
+@limiter.limit("15 per 10 minutes")
 @login_required
 def enable_totp():
     data = request.get_json()
@@ -191,6 +194,7 @@ def enable_totp():
 
 
 @auth_blueprint.route("/disable_totp", methods=["POST"])
+@limiter.limit("15 per 10 minutes")
 @login_required
 def disable_totp():
     data = request.get_json()
@@ -231,6 +235,7 @@ def disable_totp():
 
 
 @auth_blueprint.route("/change_password", methods=["POST"])
+@limiter.limit("10 per 10 minutes")
 @login_required
 def change_password():
     data = request.get_json()
@@ -270,6 +275,7 @@ def change_password():
 
 
 @auth_blueprint.route("/request_password_reset", methods=["POST"])
+@limiter.limit("10 per 10 minutes")
 def request_password_reset():
     data = request.get_json()
 
