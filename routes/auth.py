@@ -5,20 +5,14 @@ from config import Token
 from utils.database import check_if_user_exist, add_pending_user, check_if_user_exist_by_username, \
     get_user_password_hash, \
     save_user_totp_secret, confirm_user, get_pending_user, remove_pending_user, \
-    check_if_totp_active
-from utils.mail import send_verification_mail
+    check_if_totp_active, get_username_by_email, set_password, check_if_user_exist_by_email, get_password
+from utils.mail import send_verification_mail, send_password_reset_mail
 from utils.security import hash_password, check_password, generate_new_user_totp_secret, generate_password_reset_token
 from utils.session import login_required
 from utils.totp import verify_totp, generate_totp_uri
 from utils.validation import is_valid_username, is_valid_email, is_valid_password
 
 auth_blueprint = Blueprint("auth", __name__)
-
-
-@auth_blueprint.route("/init_session", methods=["GET"])
-def init_session():
-    session['initialized'] = True
-    return jsonify({"message": "Session initialized"}), 200
 
 
 @auth_blueprint.route("/register", methods=["POST"])
@@ -156,3 +150,99 @@ def enable_totp():
     current_app.config['STORAGE'].delete(username, Token.TOTP.token_name)
     save_user_totp_secret(username, totp_secret)
     return jsonify({"message": "TOTP verification has been enabled"}), 200
+
+
+@auth_blueprint.route("/change_password", methods=["POST"])
+@login_required
+def change_password():
+    data = request.get_json()
+
+    username = data.get('username')
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    totp_code = data.get('totp_code')
+
+    if not username or not current_password or not new_password:
+        return jsonify({"message": "Username, current password, and new password are required"}), 400
+
+    if not is_valid_password(new_password):
+        return jsonify({"message": "Invalid new password"}), 400
+
+    if not check_if_user_exist_by_username(username):
+        logging.info(f"Password change requested for nonexistent user: {username}")
+        return jsonify({"message": "Invalid credentials"}), 400
+
+    stored_password = get_password(username)
+    if not check_password(current_password, stored_password):
+        return jsonify({"message": "Invalid credentials"}), 400
+
+    totp_secret = check_if_totp_active(username)
+    if totp_secret:
+        if not totp_code:
+            return jsonify({"message": "TOTP code is required"}), 400
+
+        if not verify_totp(totp_code, totp_secret):
+            return jsonify({"message": "Invalid TOTP code"}), 400
+
+    set_password(username, hash_password(new_password))
+
+    logging.info(f"Password changed successfully for user {username}")
+
+    return jsonify({"message": "Password changed successfully"}), 200
+
+
+@auth_blueprint.route("/request_password_reset", methods=["POST"])
+def request_password_reset():
+    data = request.get_json()
+
+    email = data.get('email')
+    token = data.get('token')
+    new_password = data.get('new_password')
+    totp_code = data.get('totp_code')
+
+    if not is_valid_email(email):
+        return jsonify({"message": "Invalid email"}), 400
+
+    if not check_if_user_exist_by_email(email):
+        logging.info(f"Password reset requested for nonexistent email: {email}")
+        return jsonify({"message": "If the email exists, a reset link will be sent"}), 200
+
+    username = get_username_by_email(email)
+
+    if token and new_password:
+        totp_secret = check_if_totp_active(username)
+        if totp_secret:
+            if not totp_code:
+                return jsonify({"message": "TOTP code is required"}), 400
+
+            if not verify_totp(totp_code, totp_secret):
+                return jsonify({"message": "Invalid TOTP code"}), 400
+
+        if not is_valid_password(new_password):
+            return jsonify({"message": "Invalid password"}), 400
+
+        correct_token = current_app.config['STORAGE'].get(username, Token.PASSWORD_RESET.token_name)
+
+        if token != correct_token:
+            return jsonify({"message": "Invalid token"}), 400
+
+        set_password(username, hash_password(new_password))
+
+        return jsonify({"message": "Password reset successful"}), 200
+
+    else:
+        reset_token = generate_password_reset_token()
+        logging.info(f"Generate password reset token {reset_token} for user {email}")
+
+        current_app.config['STORAGE'].set(
+            username,
+            Token.PASSWORD_RESET.token_name,
+            reset_token,
+            ttl=Token.PASSWORD_RESET.ttl
+        )
+        logging.info(f"Password reset token generated for {email}")
+
+        send_password_reset_mail(email, reset_token)
+        logging.info(f"Password reset email sent to {email}")
+
+        return jsonify({"message": "If the email exists, a reset link will be sent"}), 200

@@ -84,6 +84,50 @@ def check_if_user_exist_by_email(email, check_not_confirmed=False):
     return False
 
 
+def get_username_by_email(email, check_not_confirmed=False):
+    users_ref = db.collection("users")
+    query = users_ref.where("email", "==", email).stream()
+
+    for doc in query:
+        return doc.id
+
+    if check_not_confirmed:
+        pending_ref = db.collection("pending_users")
+        query_pending = pending_ref.where("email", "==", email).stream()
+
+        for doc in query_pending:
+            username = doc.id
+
+            verification_token = current_app.config['STORAGE'].get(username, Token.VERIFICATION.token_name)
+            if not verification_token:
+                remove_pending_user(username)
+                return None
+            else:
+                return username
+
+    return None
+
+
+def set_password(username, password):
+    user_ref = db.collection("users").document(username)
+    user_doc = user_ref.get()
+
+    if not user_doc.exists:
+        raise ValueError("User does not exist.")
+
+    user_ref.update({'password': password})
+
+
+def get_password(username):
+    user_ref = db.collection("users").document(username)
+    user_doc = user_ref.get()
+
+    if not user_doc.exists:
+        raise ValueError("User does not exist.")
+
+    return user_doc.get('password')
+
+
 def check_if_user_exist(username, email, check_not_confirmed=False):
     return check_if_user_exist_by_username(username, check_not_confirmed) or check_if_user_exist_by_email(email, check_not_confirmed)
 
