@@ -4,6 +4,7 @@ from flask import Flask
 
 from extensions import init_extensions
 from routes.auth import auth_blueprint
+from routes.account import account_blueprint
 
 
 log_format = "%(asctime)s - %(levelname)s - %(funcName)s - %(message)s"
@@ -22,6 +23,7 @@ def create_app():
     init_extensions(flask_app)
 
     flask_app.register_blueprint(auth_blueprint, url_prefix="/auth")
+    flask_app.register_blueprint(account_blueprint, url_prefix="/account")
 
     return flask_app
 

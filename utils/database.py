@@ -64,8 +64,17 @@ def delete_user(identifier):
         user_ref = db.collection("users").document(user_found)
         identifier = user_found
 
+    devices_ref = user_ref.collection("devices")
+    devices_query = devices_ref.where("username", "==", identifier).stream()
+    for device in devices_query:
+        devices_ref.document(device.id).delete()
+
+    events_ref = user_ref.collection("events")
+    events_query = events_ref.where("username", "==", identifier).stream()
+    for event in events_query:
+        events_ref.document(event.id).delete()
+
     user_ref.delete()
-    print(f"User '{identifier}' and associated data have been deleted.")
 
 
 def check_if_user_exist_by_username(username, check_not_confirmed=False):
