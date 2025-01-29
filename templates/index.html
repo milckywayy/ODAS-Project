@@ -51,10 +51,16 @@
             $.ajax({
                 url: "/messages/get_all_messages",
                 method: "GET",
-                success: function (response) {
+                success: async function (response) {
                     let messagesHtml = "";
-                    response.messages.forEach(msg => {
+
+                    for (const msg of response.messages) {
                         let lockIcon = msg.is_public ? "" : `<span class="ml-2 text-gray-500"><i class="fas fa-lock"></i></span>`;
+
+                        let verificationResult = await verifyMessage(msg.username, msg.title + msg.content, msg.signature);
+                        let verificationBadge = verificationResult
+                            ? `<span class="text-green-500 text-sm">Verified</span>`
+                            : `<span class="text-red-500 text-sm">Invalid Signature</span>`;
 
                         messagesHtml += `
                             <a href="/profile/${msg.username}" class="block">
@@ -63,12 +69,12 @@
                                     <div>
                                         <h4 class="text-lg font-semibold flex items-center">${msg.title} ${lockIcon}</h4>
                                         <p class="text-gray-600">${msg.content}</p>
-                                        <small class="text-gray-400">By: ${msg.username}, posted on: ${msg.timestamp}</small>
+                                        <small class="text-gray-400">By: ${msg.username}, posted on: ${msg.timestamp} ${verificationBadge}</small>
                                     </div>
                                 </div>
                             </a>
                         `;
-                    });
+                    }
                     $("#messages-container").html(messagesHtml);
                 },
                 error: function () {
@@ -85,12 +91,18 @@
             $("#message-modal").removeClass("flex").addClass("hidden");
         });
 
-        $("#message-form").on("submit", function (event) {
+        $("#message-form").on("submit", async function (event) {
             event.preventDefault();
+
+            const privateKeyPem = getPrivateKeyPem();
+            const privateKey = await importPrivateKey(privateKeyPem);
+            const message = $("#title").val() + $("#content").val();
+            const signature = await signMessage(privateKey, message);
 
             const messageData = {
                 title: $("#title").val(),
                 content: $("#content").val(),
+                signature: signature,
                 is_public: $("#is_public").is(":checked")
             };
 

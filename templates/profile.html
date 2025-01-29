@@ -57,13 +57,19 @@
                                 <button class='edit-message bg-yellow-500 text-white py-1 px-3 rounded-full text-sm' data-id='${msg.id}' data-title='${msg.title}' data-content='${msg.content}' data-is-public='${msg.is_public}'>Edit</button>
                             {% endif %}
                         `;
+
+                        let verificationResult = verifyMessage(msg.username, msg.title + msg.content, msg.signature);
+                        let verificationBadge = verificationResult
+                            ? `<span class="text-green-500 text-sm">Verified</span>`
+                            : `<span class="text-red-500 text-sm">Invalid Signature</span>`;
+
                         messagesHtml += `
                             <div class="cursor-pointer hover:bg-gray-100 transition bg-white p-4 shadow-md rounded-lg flex items-start space-x-4 edit-message" data-id="${msg.id}" data-title="${msg.title}" data-content="${msg.content}" data-is-public="${msg.is_public}">
                                 <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="User Avatar" class="w-12 h-12 rounded-full">
                                 <div>
                                     <h4 class="text-lg font-semibold">${msg.title} ${lockIcon}</h4>
                                     <p class="text-gray-600">${msg.content}</p>
-                                    <small class="text-gray-400">Posted on: ${msg.timestamp}</small>
+                                    <small class="text-gray-400">Posted on: ${msg.timestamp} ${verificationBadge}</small>
                                 </div>
                             </div>
                         `;
@@ -89,36 +95,8 @@
             $("#message-modal").removeClass("flex").addClass("hidden");
         });
 
-        $("#message-form").on("submit", function (event) {
-            event.preventDefault();
-            let messageId = $("#message-id").val();
-            let url = messageId ? `/messages/edit_message/${messageId}` : "/messages/add_message";
-            let method = messageId ? "POST" : "POST";
-
-            const messageData = {
-                title: $("#title").val(),
-                content: $("#content").val(),
-                is_public: $("#is_public").is(":checked")
-            };
-
-            $.ajax({
-                url: url,
-                method: method,
-                contentType: "application/json",
-                data: JSON.stringify(messageData),
-                success: function () {
-                    $("#message-modal").removeClass("flex").addClass("hidden");
-                    fetchUserMessages();
-                    $("#message-form")[0].reset();
-                },
-                error: function (xhr) {
-                    const errorMessage = xhr.responseJSON?.message || "An error occurred";
-                    alert(errorMessage);
-                }
-            });
-        });
-
         fetchUserMessages();
     });
 </script>
+
 {% endblock %}

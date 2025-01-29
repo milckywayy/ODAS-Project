@@ -210,7 +210,8 @@ def confirm_user(username):
     doc_data = doc.to_dict()
     db.collection('users').document(username).set({
         'email': doc_data.get('email'),
-        'password': doc_data.get('password')
+        'password': doc_data.get('password'),
+        'public_key': doc_data.get('public_key')
     })
 
     remove_pending_user(username)
@@ -311,12 +312,27 @@ def get_user_profile(username):
     return user_data
 
 
-def save_message(username, title, content, is_public):
+def save_public_key(username, public_key):
+    db.collection("pending_users").document(username).set({"public_key": public_key}, merge=True)
+
+
+def get_public_key(username):
+    doc_ref = db.collection("users").document(username)
+    doc = doc_ref.get()
+
+    if not doc.exists:
+        return None
+
+    return doc.to_dict().get("public_key")
+
+
+def save_message(username, title, content, is_public, signature):
     message_data = {
         "title": title,
         "content": content,
         "is_public": is_public,
-        "timestamp": firestore.SERVER_TIMESTAMP
+        "timestamp": firestore.SERVER_TIMESTAMP,
+        "signature": signature
     }
     db.collection("users").document(username).collection("messages").add(message_data)
 
@@ -354,3 +370,5 @@ def update_message(username, message_id, title, content, is_public):
         "is_public": is_public,
         "timestamp": firestore.SERVER_TIMESTAMP
     })
+
+

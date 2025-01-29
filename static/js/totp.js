@@ -11,7 +11,7 @@ $(document).ready(function () {
 
         loginData.totp_code = totpCode;
         const apiEndpoint = loginData.endpoint;
-        const callback = loginData.callback ? loginData.callback : '/';
+        const callback = loginData.callback;
 
         $.ajax({
             url: apiEndpoint,
@@ -23,9 +23,11 @@ $(document).ready(function () {
                     .text(response.message)
                     .addClass("text-green-500");
 
-                   setTimeout(() => {
-                        window.location.href = callback;
-                    }, 1500);
+                    if (callback) {
+                        setTimeout(() => {
+                            window.location.href = callback;
+                        }, 1500);
+                    }
             },
             error: function (xhr) {
                 const errorMessage =

@@ -1,3 +1,4 @@
+import base64
 import re
 
 
@@ -25,3 +26,14 @@ def is_valid_password(password):
         any(char.isalpha() for char in password) and
         any(char in '!@#$%^&*()-_=+[]{};:,<.>/?' for char in password)
     )
+
+
+def is_valid_public_key(public_key):
+    if not public_key:
+        return False
+
+    if not (public_key.startswith("-----BEGIN PUBLIC KEY-----") and
+            public_key.endswith("-----END PUBLIC KEY-----")):
+        return False
+
+    return True

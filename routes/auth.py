@@ -6,14 +6,14 @@ from config import Token, Event
 from utils.database import check_if_user_exist, add_pending_user, check_if_user_exist_by_username, \
     save_user_totp_secret, confirm_user, get_pending_user, remove_pending_user, \
     check_if_totp_active, get_username_by_email, set_password, check_if_user_exist_by_email, get_password, delete_user, \
-    log_user_event, check_if_device_used, save_user_device, get_email_by_username
+    log_user_event, check_if_device_used, save_user_device, get_email_by_username, save_public_key
 from utils.mail import send_verification_mail, send_password_reset_mail, send_new_device_login_mail
 from utils.ratelimiter import limiter
 from utils.security import hash_password, check_password, generate_new_user_totp_secret, generate_password_reset_token
 from utils.session import login_required
 from utils.totp import verify_totp, generate_totp_uri_and_qr
 from utils.useragent import get_device_info
-from utils.validation import is_valid_username, is_valid_email, is_valid_password
+from utils.validation import is_valid_username, is_valid_email, is_valid_password, is_valid_public_key
 
 auth_blueprint = Blueprint("auth", __name__)
 
@@ -26,6 +26,7 @@ def register():
     username = data.get('username')
     email = data.get('email')
     password = data.get('password')
+    public_key = data.get('public_key')
 
     if not is_valid_username(username):
         return jsonify({"message": "Invalid username"}), 400
@@ -36,12 +37,17 @@ def register():
     if not is_valid_password(password):
         return jsonify({"message": "Invalid password"}), 400
 
+    if not is_valid_public_key(public_key):
+        return jsonify({"message": "Invalid public key"}), 400
+
     if check_if_user_exist(username, email, check_not_confirmed=True):
         logging.info(f"User {username} already exists")
         return jsonify({"message": "User already exists"}), 400
 
     verification_code = add_pending_user(username, email, hash_password(password))
     logging.info(f"User with username {username} has been saved and now is waiting for verification")
+
+    save_public_key(username, public_key)
 
     send_verification_mail(email, username, verification_code)
     logging.info(f"Verification code {verification_code} sent to {email}")

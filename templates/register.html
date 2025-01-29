@@ -25,31 +25,72 @@
 
 <script>
     $(document).ready(function() {
-        $('#register-form').on('submit', function(event) {
+        $('#register-form').on('submit', async function(event) {
             event.preventDefault();
 
-            const username = $('#username').val();
-            const email = $('#email').val();
-            const password = $('#password').val();
+            try {
+                const username = $('#username').val().trim();
+                const email = $('#email').val().trim();
+                const password = $('#password').val().trim();
 
-            $.ajax({
-                url: '/auth/register',
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({ username, email, password }),
-                success: function(response) {
-                    $('#response-message').text(response.message).removeClass('text-red-500').addClass('text-green-500');
-
-                    setTimeout(function () {
-                        window.location.href = "/";
-                    }, 1500);
-                },
-                error: function(xhr) {
-                    const errorMessage = xhr.responseJSON ? xhr.responseJSON.message : 'An error occurred';
-                    $('#response-message').text(errorMessage).removeClass('text-green-500').addClass('text-red-500');
+                if (!username || !email || !password) {
+                    $('#response-message').text('Fill all fields.')
+                        .removeClass('text-green-500').addClass('text-red-500');
+                    return;
                 }
-            });
+
+                let keyPair;
+                try {
+                    keyPair = await generateKeyPair();
+                } catch (e) {
+                    $('#response-message').text('Failed to generate keys.')
+                        .removeClass('text-green-500').addClass('text-red-500');
+                    return;
+                }
+
+                const publicKeyPem = await exportPublicKey(keyPair.publicKey);
+                const privateKeyPem = await exportPrivateKey(keyPair.privateKey);
+
+                if (!publicKeyPem || !privateKeyPem) {
+                    $('#response-message').text('Failed to export keys.')
+                        .removeClass('text-green-500').addClass('text-red-500');
+                    return;
+                }
+
+                savePrivateKeyPem(privateKeyPem);
+
+                const response = await $.ajax({
+                    url: '/auth/register',
+                    method: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        username,
+                        email,
+                        password,
+                        public_key: publicKeyPem
+                    })
+                });
+
+                $('#response-message').text(response.message)
+                    .removeClass('text-red-500').addClass('text-green-500');
+
+                setTimeout(() => {
+                    window.location.href = "/";
+                }, 1500);
+
+            } catch (error) {
+                let errorMessage = 'Error.';
+                if (error.responseJSON && error.responseJSON.message) {
+                    errorMessage = error.responseJSON.message;
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+
+                $('#response-message').text(errorMessage)
+                    .removeClass('text-green-500').addClass('text-red-500');
+            }
         });
     });
 </script>
+
 {% endblock %}
