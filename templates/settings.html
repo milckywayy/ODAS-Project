@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}User Profile{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-2 mb-6">
+    <!-- User Profile Card -->
+    <div class="bg-white shadow-md rounded-lg p-6 col-span-1">
+        <h1 class="text-2xl font-bold text-gray-700 mb-4">User Profile</h1>
+        <div id="profile-info" class="mb-4">
+            <p class="text-gray-600"><strong>Username:</strong> <span id="username"></span></p>
+            <p class="text-gray-600"><strong>Email:</strong> <span id="email"></span></p>
+        </div>
+        <a href="/change-password" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Change Password</a>
+    </div>
+
+    <!-- Two-Factor Authentication Section -->
+    <div class="bg-white shadow-md rounded-lg p-6 col-span-1">
+        <h2 class="text-xl font-bold text-gray-700">Two-Factor Authentication (TOTP)</h2>
+        <p id="totp-status" class="text-gray-600 mt-2"></p>
+        <a id="toggle-totp" class="mt-4 w-full inline-block text-center py-2 px-4 rounded-md"></a>
+        <p id="totp-message" class="mt-4 text-center"></p>
+    </div>
+</div>
+
+<div class="max-w-4xl mx-auto grid gap-6 grid-cols-1">
+    <!-- Devices List -->
+    <div class="bg-white shadow-md rounded-lg p-6 col-span-1">
+        <h2 class="text-xl font-bold text-gray-700">Devices</h2>
+        <ul id="device-list" class="list-disc ml-6 text-gray-600"></ul>
+    </div>
+
+    <!-- Event Logs -->
+    <div class="bg-white shadow-md rounded-lg p-6 col-span-1">
+        <h2 class="text-xl font-bold text-gray-700">Event Logs</h2>
+        <ul id="event-list" class="list-disc ml-6 text-gray-600"></ul>
+    </div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        $.ajax({
+            url: "/account/profile_data",
+            type: "GET",
+            success: function (response) {
+                $("#username").text(response.username);
+                $("#email").text(response.email);
+
+                let devices = response.devices || [];
+                devices.forEach(device => {
+                    $("#device-list").append(`<li>${device.device_info}</li>`);
+                });
+
+                let events = response.events || [];
+                events.sort((a, b) => {
+                    let regex = /([0-9]{2}:[0-9]{2}:[0-9]{2}) ([0-9]{2}-[0-9]{2}-[0-9]{4})/;
+                    let [, timeA, dateA] = a.timestamp.match(regex);
+                    let [, timeB, dateB] = b.timestamp.match(regex);
+
+                    let dateObjA = new Date(dateA.split("-").reverse().join("-") + "T" + timeA);
+                    let dateObjB = new Date(dateB.split("-").reverse().join("-") + "T" + timeB);
+
+                    return dateObjB - dateObjA;
+                });
+
+                events.forEach(event => {
+                    $("#event-list").append(
+                        `<li><strong>${event.event_type}</strong>: ${event.timestamp}, ${event.details}</li>`
+                    );
+                });
+
+                if (response.totp_enabled) {
+                    $("#totp-status").text("TOTP is currently ENABLED.");
+                    $("#toggle-totp")
+                        .text("Disable TOTP")
+                        .removeClass("bg-blue-600 hover:bg-blue-700")
+                        .addClass("bg-red-600 hover:bg-red-700 text-white")
+                        .attr("href", "/disable-totp");
+                } else {
+                    $("#totp-status").text("TOTP is currently DISABLED.");
+                    $("#toggle-totp")
+                        .text("Enable TOTP")
+                        .removeClass("bg-red-600 hover:bg-red-700")
+                        .addClass("bg-blue-600 hover:bg-blue-700 text-white")
+                        .attr("href", "/enable-totp");
+                }
+            },
+            error: function () {
+                alert("Failed to load user profile.");
+            }
+        });
+    });
+</script>
+{% endblock %}

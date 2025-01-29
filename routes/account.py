@@ -2,12 +2,25 @@ import logging
 
 from flask import request, session, jsonify, Blueprint
 
-from utils.database import get_password, check_if_totp_active, delete_user, check_if_user_exist_by_username
+from utils.database import get_password, check_if_totp_active, delete_user, check_if_user_exist_by_username, \
+    get_user_profile
 from utils.security import check_password
 from utils.session import login_required
 from utils.totp import verify_totp
 
 account_blueprint = Blueprint("account", __name__)
+
+
+@account_blueprint.route("/profile_data", methods=["GET"])
+@login_required
+def profile():
+    username = session.get("username")
+    user_data = get_user_profile(username)
+
+    if not user_data:
+        return jsonify({"message": "User not found"}), 404
+
+    return jsonify(user_data), 200
 
 
 @account_blueprint.route("/delete_account", methods=["DELETE"])

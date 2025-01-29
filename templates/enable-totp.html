@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto mt-10 p-6 max-w-md bg-white rounded-lg shadow-md">
+    <h2 class="text-xl font-bold mb-4">Enable Two-Factor Authentication (TOTP)</h2>
+    <p class="mb-4">Scan the QR code in your authentication app, then enter the generated code.</p>
+
+    <div id="totp-qr-container" class="mb-4 hidden">
+        <img id="totp-qr" src="" alt="TOTP QR Code" class="mx-auto">
+    </div>
+
+    <form id="enable-totp-form">
+        <label for="totp-code" class="block text-sm font-medium text-gray-700">TOTP Code:</label>
+        <input type="text" id="totp-code" name="totp_code" class="w-full mt-1 p-2 border rounded-md" required>
+
+        <button type="submit" class="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+            Enable TOTP
+        </button>
+    </form>
+
+    <p id="enable-totp-message" class="mt-4 text-center"></p>
+</div>
+
+<script>
+$(document).ready(function () {
+    $.ajax({
+        url: "/auth/enable_totp",
+        method: "POST",
+        contentType: "application/json",
+        data: JSON.stringify({}),
+        success: function (response) {
+            if (response.qr_base64) {
+                $("#totp-qr").attr("src", "data:image/png;base64," + response.qr_base64);
+                $("#totp-qr-container").removeClass("hidden");
+            }
+        }
+    });
+
+    $("#enable-totp-form").on("submit", function (event) {
+        event.preventDefault();
+        let totpCode = $("#totp-code").val();
+
+        $.ajax({
+            url: "/auth/enable_totp",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ totp_code: totpCode }),
+            success: function (response) {
+                $("#enable-totp-message").text(response.message).addClass("text-green-500");
+
+                setTimeout(function () {
+                    window.location.href = "/settings";
+                }, 1500);
+            },
+            error: function (xhr) {
+                $("#enable-totp-message").text(xhr.responseJSON?.message || "Błąd").addClass("text-red-500");
+            }
+        });
+    });
+});
+</script>
+
+{% endblock %}

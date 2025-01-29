@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mx-auto mt-10 p-6 max-w-md bg-white rounded-lg shadow-md">
+    <h2 class="text-xl font-bold mb-4">Disable Two-Factor Authentication (TOTP)</h2>
+    <p class="mb-4">To disable TOTP, please enter your password and the code from your authentication app.</p>
+
+    <form id="disable-totp-form">
+        <label for="password" class="block text-sm font-medium text-gray-700">Password:</label>
+        <input type="password" id="password" name="password" class="w-full mt-1 p-2 border rounded-md" required>
+
+        <label for="totp-code" class="block mt-4 text-sm font-medium text-gray-700">TOTP Code:</label>
+        <input type="text" id="totp-code" name="totp_code" class="w-full mt-1 p-2 border rounded-md" required>
+
+        <button type="submit" class="mt-4 w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700">
+            Disable TOTP
+        </button>
+    </form>
+
+    <p id="disable-totp-message" class="mt-4 text-center"></p>
+</div>
+
+<script>
+$(document).ready(function () {
+    $("#disable-totp-form").on("submit", function (event) {
+        event.preventDefault();
+
+        let password = $("#password").val();
+        let totpCode = $("#totp-code").val();
+
+        $.ajax({
+            url: "/auth/disable_totp",
+            method: "POST",
+            contentType: "application/json",
+            data: JSON.stringify({ password: password, totp_code: totpCode }),
+            success: function (response) {
+                $("#disable-totp-message").text(response.message).addClass("text-green-500");
+
+                setTimeout(function () {
+                    window.location.href = "/settings";
+                }, 1500);
+            },
+            error: function (xhr) {
+                $("#disable-totp-message").text(xhr.responseJSON?.message || "Błąd").addClass("text-red-500");
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -147,6 +147,30 @@ def get_username_by_email(email, check_not_confirmed=False):
     return None
 
 
+def get_email_by_username(username, check_not_confirmed=False):
+    users_ref = db.collection("users")
+    query = users_ref.document(username).get()
+
+    if query.exists:
+        return query.to_dict().get("email")
+
+    if check_not_confirmed:
+        pending_ref = db.collection("pending_users")
+        query_pending = pending_ref.document(username).get()
+
+        if query_pending.exists:
+            email = query_pending.to_dict().get("email")
+
+            verification_token = current_app.config['STORAGE'].get(username, Token.VERIFICATION.token_name)
+            if not verification_token:
+                remove_pending_user(username)
+                return None
+            else:
+                return email
+
+    return None
+
+
 def set_password(username, password):
     user_ref = db.collection("users").document(username)
     user_doc = user_ref.get()
@@ -254,3 +278,34 @@ def check_if_device_used(username, device_info):
         return True
 
     return False
+
+
+def get_user_profile(username):
+    user_ref = db.collection("users").document(username)
+    user_doc = user_ref.get()
+
+    if not user_doc.exists:
+        return None
+
+    user_data = user_doc.to_dict()
+
+    user_data["username"] = user_doc.id
+    user_data["email"] = user_data.get("email")
+    user_data["totp_enabled"] = check_if_totp_active(username)
+
+    for key, value in user_data.items():
+        if isinstance(value, bytes):
+            try:
+                user_data[key] = value.decode("utf-8")
+            except UnicodeDecodeError:
+                user_data[key] = str(value)
+
+    devices_ref = user_ref.collection("devices")
+    devices = [device.to_dict() for device in devices_ref.stream()]
+    user_data["devices"] = devices
+
+    events_ref = user_ref.collection("events")
+    events = [event.to_dict() for event in events_ref.stream()]
+    user_data["events"] = events
+
+    return user_data

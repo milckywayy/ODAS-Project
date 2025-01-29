@@ -6,12 +6,12 @@ from config import Token, Event
 from utils.database import check_if_user_exist, add_pending_user, check_if_user_exist_by_username, \
     save_user_totp_secret, confirm_user, get_pending_user, remove_pending_user, \
     check_if_totp_active, get_username_by_email, set_password, check_if_user_exist_by_email, get_password, delete_user, \
-    log_user_event, check_if_device_used, save_user_device
-from utils.mail import send_verification_mail, send_password_reset_mail
+    log_user_event, check_if_device_used, save_user_device, get_email_by_username
+from utils.mail import send_verification_mail, send_password_reset_mail, send_new_device_login_mail
 from utils.ratelimiter import limiter
 from utils.security import hash_password, check_password, generate_new_user_totp_secret, generate_password_reset_token
 from utils.session import login_required
-from utils.totp import verify_totp, generate_totp_uri
+from utils.totp import verify_totp, generate_totp_uri_and_qr
 from utils.useragent import get_device_info
 from utils.validation import is_valid_username, is_valid_email, is_valid_password
 
@@ -43,7 +43,7 @@ def register():
     verification_code = add_pending_user(username, email, hash_password(password))
     logging.info(f"User with username {username} has been saved and now is waiting for verification")
 
-    send_verification_mail(email, verification_code)
+    send_verification_mail(email, username, verification_code)
     logging.info(f"Verification code {verification_code} sent to {email}")
 
     return jsonify({'message': 'User successfully registered. Check your mailbox for verification code'}), 200
@@ -115,7 +115,10 @@ def login():
     log_user_event(username, Event.SUCCESSFUL_LOGIN_ATTEMPT, user_agent_string)
 
     if not check_if_device_used(username, device_info):
+        email = get_email_by_username(username)
+
         save_user_device(username, device_info)
+        send_new_device_login_mail(email, device_info)
         log_user_event(username, Event.LOGIN_FROM_NEW_DEVICE, user_agent_string)
 
     session['username'] = username
@@ -158,9 +161,9 @@ def enable_totp():
             ttl=Token.TOTP.ttl
         )
 
-        totp_uri = generate_totp_uri(new_user_totp_secret)
+        totp_uri, qr_base64 = generate_totp_uri_and_qr(new_user_totp_secret)
 
-        return jsonify({"message": "TOTP uri has been generated", "totp_uri": totp_uri}), 200
+        return jsonify({"message": "TOTP uri has been generated", "totp_uri": totp_uri, "qr_base64": qr_base64}), 200
 
     totp_secret = current_app.config['STORAGE'].get(username, Token.TOTP.token_name)
     if not verify_totp(totp_code, totp_secret):

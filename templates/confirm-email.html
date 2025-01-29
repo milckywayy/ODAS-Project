@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Email{% endblock %}
+
+{% block content %}
+<div class="max-w-md mx-auto bg-white shadow-md rounded-lg p-6 text-center">
+    <h2 class="text-2xl font-bold text-gray-700 mb-4">Confirming Your Email...</h2>
+    <div id="response-message" class="text-gray-600">Please wait while we process your request.</div>
+</div>
+
+<script>
+    $(document).ready(function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const username = urlParams.get('username');
+        const verificationToken = urlParams.get('verification_token');
+
+        $.ajax({
+            url: `/auth/confirm_email/${username}/${verificationToken}`,
+            method: 'GET',
+            success: function(response) {
+                $('#response-message').text(response.message).removeClass('text-red-500').addClass('text-green-500');
+            },
+            error: function(xhr) {
+                const errorMessage = xhr.responseJSON ? xhr.responseJSON.message : 'An error occurred';
+                $('#response-message').text(errorMessage).removeClass('text-green-500').addClass('text-red-500');
+            }
+        });
+    });
+</script>
+{% endblock %}
