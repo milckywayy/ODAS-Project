@@ -309,3 +309,48 @@ def get_user_profile(username):
     user_data["events"] = events
 
     return user_data
+
+
+def save_message(username, title, content, is_public):
+    message_data = {
+        "title": title,
+        "content": content,
+        "is_public": is_public,
+        "timestamp": firestore.SERVER_TIMESTAMP
+    }
+    db.collection("users").document(username).collection("messages").add(message_data)
+
+
+def get_user_messages(username, show_all=False):
+    messages_ref = db.collection("users").document(username).collection("messages")
+    if show_all:
+        query = messages_ref.stream()
+    else:
+        query = messages_ref.where("is_public", "==", True).stream()
+
+    return [{"id": msg.id, **msg.to_dict()} for msg in query]
+
+
+def get_all_messages(show_all=False):
+    users_ref = db.collection("users").stream()
+    messages = []
+    for user in users_ref:
+        messages_ref = db.collection("users").document(user.id).collection("messages")
+        if show_all:
+            query = messages_ref.stream()
+        else:
+            query = messages_ref.where("is_public", "==", True).stream()
+
+        messages.extend([{"id": msg.id, "username": user.id, **msg.to_dict()} for msg in query])
+
+    return messages
+
+
+def update_message(username, message_id, title, content, is_public):
+    message_ref = db.collection("users").document(username).collection("messages").document(message_id)
+    message_ref.update({
+        "title": title,
+        "content": content,
+        "is_public": is_public,
+        "timestamp": firestore.SERVER_TIMESTAMP
+    })

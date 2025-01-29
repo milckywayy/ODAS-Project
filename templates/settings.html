@@ -11,7 +11,7 @@
             <p class="text-gray-600"><strong>Username:</strong> <span id="username"></span></p>
             <p class="text-gray-600"><strong>Email:</strong> <span id="email"></span></p>
         </div>
-        <a href="/change-password" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Change Password</a>
+        <a href="/change_password" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">Change Password</a>
     </div>
 
     <!-- Two-Factor Authentication Section -->
@@ -75,14 +75,14 @@
                         .text("Disable TOTP")
                         .removeClass("bg-blue-600 hover:bg-blue-700")
                         .addClass("bg-red-600 hover:bg-red-700 text-white")
-                        .attr("href", "/disable-totp");
+                        .attr("href", "/disable_totp");
                 } else {
                     $("#totp-status").text("TOTP is currently DISABLED.");
                     $("#toggle-totp")
                         .text("Enable TOTP")
                         .removeClass("bg-red-600 hover:bg-red-700")
                         .addClass("bg-blue-600 hover:bg-blue-700 text-white")
-                        .attr("href", "/enable-totp");
+                        .attr("href", "/enable_totp");
                 }
             },
             error: function () {

@@ -12,6 +12,8 @@ class Config:
     TOTP_TOKEN_TTL = 60 * 30  # 30 minutes
     PASSWORD_RESET_TOKEN_TTL = 60 * 30  # 30 minutes
 
+    ALLOWED_TAGS = ["b", "i", "strong", "em", "img"]
+
 
 class Token(Enum):
     VERIFICATION = ("verification_token", 60 * 30)  # 30 minutes

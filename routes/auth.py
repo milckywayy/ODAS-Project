@@ -272,16 +272,11 @@ def request_password_reset():
 
     user_agent_string = request.headers.get('User-Agent')
 
-    if not is_valid_email(email):
-        return jsonify({"message": "Invalid email"}), 400
-
-    if not check_if_user_exist_by_email(email):
-        logging.info(f"Password reset requested for nonexistent email: {email}")
-        return jsonify({"message": "If the email exists, a reset link will be sent"}), 200
-
-    username = get_username_by_email(email)
-
     if token and new_password:
+        username = data.get('username')
+        if not username:
+            return jsonify({"message": "Username is required"}), 400
+
         totp_secret = check_if_totp_active(username)
         if totp_secret:
             if not totp_code:
@@ -306,6 +301,15 @@ def request_password_reset():
         return jsonify({"message": "Password reset successful"}), 200
 
     else:
+        username = get_username_by_email(email)
+
+        if not is_valid_email(email):
+            return jsonify({"message": "Invalid email"}), 400
+
+        if not check_if_user_exist_by_email(email):
+            logging.info(f"Password reset requested for nonexistent email: {email}")
+            return jsonify({"message": "If the email exists, a reset link will be sent"}), 200
+
         reset_token = generate_password_reset_token()
         logging.info(f"Generate password reset token {reset_token} for user {email}")
 
@@ -317,7 +321,7 @@ def request_password_reset():
         )
         logging.info(f"Password reset token generated for {email}")
 
-        send_password_reset_mail(email, reset_token)
+        send_password_reset_mail(email, username, reset_token)
         logging.info(f"Password reset email sent to {email}")
 
         return jsonify({"message": "If the email exists, a reset link will be sent"}), 200

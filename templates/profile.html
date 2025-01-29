@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}User Profile{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto bg-white shadow-md rounded-lg p-6 text-center">
+    <div class="flex items-center space-x-4">
+        <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="User Avatar" class="w-16 h-16 rounded-full">
+        <h2 class="text-xl font-bold">{{ username }}</h2>
+    </div>
+</div>
+
+<!-- Modal for creating/editing messages -->
+<div id="message-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+    <div class="bg-white p-6 rounded-lg shadow-lg w-full max-w-md transform transition-all scale-95">
+        <h3 class="text-xl font-bold mb-4 text-center" id="modal-title">New Post</h3>
+        <form id="message-form" class="space-y-4">
+            <input type="hidden" id="message-id">
+            <div>
+                <label for="title" class="block text-gray-600">Title</label>
+                <input type="text" id="title" name="title" class="w-full mt-1 p-2 border rounded-md focus:ring-2 focus:ring-blue-300 focus:outline-none" required>
+            </div>
+            <div>
+                <label for="content" class="block text-gray-600">Message</label>
+                <textarea id="content" name="content" rows="4" class="w-full mt-1 p-2 border rounded-md focus:ring-2 focus:ring-blue-300 focus:outline-none" placeholder="What's on your mind?" required></textarea>
+            </div>
+            <div class="flex items-center">
+                <input type="checkbox" id="is_public" name="is_public" class="mr-2">
+                <label for="is_public" class="text-gray-600">Make public</label>
+            </div>
+            <div class="flex justify-between">
+                <button type="button" id="close-message-modal" class="bg-gray-400 text-white py-2 px-4 rounded-full transition hover:bg-gray-500">Cancel</button>
+                <button type="submit" class="bg-blue-500 text-white py-2 px-4 rounded-full font-semibold transition hover:bg-blue-600">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- User Messages -->
+<div class="max-w-2xl mx-auto mt-8">
+    <h3 class="text-xl font-bold text-gray-700 mb-4">Your Messages</h3>
+    <div id="user-messages-container" class="space-y-4"></div>
+</div>
+
+<script>
+    $(document).ready(function () {
+        function fetchUserMessages() {
+            $.ajax({
+                url: "/messages/get_user_messages/{{ username }}",
+                method: "GET",
+                success: function (response) {
+                    let messagesHtml = "";
+                    response.messages.forEach(msg => {
+                        let lockIcon = msg.is_public ? "" : `<span class='ml-2 text-gray-500'><i class='fas fa-lock'></i></span>`;
+                        let editButton = `
+                            {% if is_logged_in %}
+                                <button class='edit-message bg-yellow-500 text-white py-1 px-3 rounded-full text-sm' data-id='${msg.id}' data-title='${msg.title}' data-content='${msg.content}' data-is-public='${msg.is_public}'>Edit</button>
+                            {% endif %}
+                        `;
+                        messagesHtml += `
+                            <div class="cursor-pointer hover:bg-gray-100 transition bg-white p-4 shadow-md rounded-lg flex items-start space-x-4 edit-message" data-id="${msg.id}" data-title="${msg.title}" data-content="${msg.content}" data-is-public="${msg.is_public}">
+                                <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="User Avatar" class="w-12 h-12 rounded-full">
+                                <div>
+                                    <h4 class="text-lg font-semibold">${msg.title} ${lockIcon}</h4>
+                                    <p class="text-gray-600">${msg.content}</p>
+                                    <small class="text-gray-400">Posted on: ${msg.timestamp}</small>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    $("#user-messages-container").html(messagesHtml);
+                },
+                error: function () {
+                    $("#user-messages-container").html("<p class='text-red-500'>Failed to load messages.</p>");
+                }
+            });
+        }
+
+        $(document).on("click", ".edit-message", function () {
+            $("#modal-title").text("Edit Message");
+            $("#message-id").val($(this).data("id"));
+            $("#title").val($(this).data("title"));
+            $("#content").val($(this).data("content"));
+            $("#is_public").prop("checked", $(this).data("is-public"));
+            $("#message-modal").removeClass("hidden").addClass("flex");
+        });
+
+        $("#close-message-modal").click(function () {
+            $("#message-modal").removeClass("flex").addClass("hidden");
+        });
+
+        $("#message-form").on("submit", function (event) {
+            event.preventDefault();
+            let messageId = $("#message-id").val();
+            let url = messageId ? `/messages/edit_message/${messageId}` : "/messages/add_message";
+            let method = messageId ? "POST" : "POST";
+
+            const messageData = {
+                title: $("#title").val(),
+                content: $("#content").val(),
+                is_public: $("#is_public").is(":checked")
+            };
+
+            $.ajax({
+                url: url,
+                method: method,
+                contentType: "application/json",
+                data: JSON.stringify(messageData),
+                success: function () {
+                    $("#message-modal").removeClass("flex").addClass("hidden");
+                    fetchUserMessages();
+                    $("#message-form")[0].reset();
+                },
+                error: function (xhr) {
+                    const errorMessage = xhr.responseJSON?.message || "An error occurred";
+                    alert(errorMessage);
+                }
+            });
+        });
+
+        fetchUserMessages();
+    });
+</script>
+{% endblock %}
