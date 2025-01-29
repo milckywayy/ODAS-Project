@@ -6,8 +6,7 @@ from extensions import init_extensions
 from routes.auth import auth_blueprint
 from routes.account import account_blueprint
 from routes.messages import messages_blueprint
-from routes.templates import login, register, home, confirm_email, settings, change_password, enable_totp, disable_totp, \
-    profile, main_blueprint
+from routes.templates import main_blueprint
 
 log_format = "%(asctime)s - %(levelname)s - %(funcName)s - %(message)s"
 
@@ -18,7 +17,7 @@ logging.basicConfig(
 )
 
 
-def create_app():
+def create_app(*args, **kwargs):
     flask_app = Flask(__name__)
     flask_app.config.from_object("config.Config")
 
@@ -32,7 +31,9 @@ def create_app():
     return flask_app
 
 
+app = create_app()
+
+
 if __name__ == "__main__":
     app = create_app()
-    # app.run()
     app.run(debug=True)
